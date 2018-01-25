@@ -1,5 +1,4 @@
 module Domain
-open System.Collections.Generic
 
     type Color = Black | White
 
@@ -58,46 +57,80 @@ open System.Collections.Generic
           liberties = (Set.union sg1.liberties sg2.liberties
                        |> Set.filter (fun ( Liberty p) -> not (stonePoints |> Set.contains p))) }
 
+    type Grid = seq<Point * StoneGroup>
+
+    let removePoint grid point = 
+        grid |> Seq.filter (fun (p, _) -> p <> point)
+
+    let replaceStoneGroup grid point stoneGroup =
+        let newGrid = removePoint grid point
+        newGrid |> Seq.append (Seq.singleton (point, stoneGroup))
 
     type Board = {
         size: int
-        grid: Dictionary<Point, StoneGroup>
+        grid: Grid
     }
 
-    let getStoneGroup board point = 
-        if board.grid.ContainsKey point
-        then Some (board.grid.Item point)
-        else None
+    let getStoneGroup grid point = 
+        grid
+        |> Seq.tryFind (fun (p, _) -> p = point) 
+        |> Option.map (fun (_, sg) -> sg)
         
     let isOnGrid board point = 
         1 <= point.row  
         && point.row <= board.size 
         && 1 <= point.col 
         && point.col <= board.size
+    
+    let removeStoneGroup grid stoneGroup = 
+        let mutable newGrid = grid
+        let updateNeighborStoneGroup nb =
+            let neighborStoneGroup = getStoneGroup grid nb
+            match neighborStoneGroup with
+            | Some sg -> if sg <> stoneGroup 
+                         then 
+                             let nbStoneGroup = addLiberty sg nb
+                             newGrid <- replaceStoneGroup grid nb nbStoneGroup
+            | None -> ()
+
+        for (Stone p ) in stoneGroup.stones do
+            for neighbor in (neighbors p) do
+                updateNeighborStoneGroup neighbor
+            newGrid <- (removePoint grid p)
+        newGrid
 
     // assumes ((isOnGrid board point) && board.grid.ContainsKey point) 
-    let placeStone board player point = 
-        let mutable adjacent_same_color = Set.empty
-        let mutable  adjacent_opposite_color = Set.empty
+    let placeStone board (Player col) point = 
+        let mutable adjacentSameColor = Set.empty
+        let mutable  adjacentOppositeColor = Set.empty
         let mutable liberties = Set.empty
-        let Player c = player
-        (neighbors point)
-        |> Seq.forall (fun p -> 
+        let mutable grid = board.grid
+        for nb in (neighbors point) do
             if (isOnGrid board point)
             then 
-                let neighborStoneGroup = getStoneGroup board p
+                let neighborStoneGroup = getStoneGroup grid nb
                 match neighborStoneGroup with
                 | Some sg -> 
-                    if (sg.color = c) 
-                    then adjacent_same_color <- (adjacent_same_color.Add sg) 
-                    else adjacent_opposite_color <- (adjacent_opposite_color.Add sg)
-                | None -> liberties <- Set.empty
-            )
-        let newStoneGroup = StoneGroup { 
-                                color = c 
+                    if (sg.color = col) 
+                    then adjacentSameColor <- (adjacentSameColor.Add sg) 
+                    else adjacentOppositeColor <- (adjacentOppositeColor.Add sg)
+                | None -> liberties <- (liberties |> Set.add (Liberty nb))
+        let mutable newStoneGroup = { 
+                                color = col
                                 stones = Set.singleton (Stone point)
                                 liberties = liberties
                                 }
+        for sameColorSg in adjacentSameColor do
+            newStoneGroup <- merge newStoneGroup sameColorSg
+        for (Stone p) in newStoneGroup.stones do
+            grid <- replaceStoneGroup grid p newStoneGroup
+        let oppositeColorRemovedLiberties = adjacentOppositeColor 
+                                            |> Set.map (fun sg -> removeLiberty sg point)
+        for sg in oppositeColorRemovedLiberties do
+            if Set.count sg.liberties = 0
+            then grid <- removeStoneGroup grid sg
+        { board with grid = grid }
+
 
 
 
