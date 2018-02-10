@@ -1,4 +1,4 @@
-module Domain
+module Go.Domain
     open System
 
     type Color = Black | White
@@ -222,27 +222,4 @@ module Domain
                         then offBoardCorners + friendlyCorners = 4
                         else friendlyCorners >= 3
                         
-    
-    let selectMove gameState =
-        let rnd = System.Random()
-        let candidates = 
-            seq { for i in 1 .. gameState.board.size 
-                    do for j in 1 .. gameState.board.size do yield (i, j)}
-            |> Seq.filter (fun (x, y) ->    let pt = {
-                                                        row = x
-                                                        col = y
-                                                     }
-                                            isValidMove gameState (Play pt) &&
-                                            not (pointIsEye gameState.board pt gameState.nextPlayer)
-            )
-
-        if Seq.isEmpty candidates
-        then Pass
-        else
-            let randomIndex = rnd.Next (Seq.length candidates - 1)
-            let random = Seq.item randomIndex candidates 
-            Play {
-                    row = (fst random)
-                    col = (snd random)
-                 }
 

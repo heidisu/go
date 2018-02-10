@@ -1,5 +1,5 @@
-﻿// Learn more about F# at http://fsharp.org
-open Domain
+﻿open Go.Domain
+open Go.Agents
 open System
 
 let cols = "ABCDEFGHIJKLMNOPQRST"
@@ -35,11 +35,15 @@ let printBoard board =
 let main argv =
     let boardSize = 9
     let mutable game = newGame boardSize
+    let bots player = 
+        match player with
+        | Player Black -> RandomAgent
+        | Player White -> RandomAgent
 
     while not (isOver game) do
         printBoard game.board
-        let move = Domain.selectMove game
+        let move = selectMove game (bots game.nextPlayer)
         printMove game.nextPlayer move
-        game <- Domain.applyMove game game.nextPlayer move 
-    printfn "Hello World from F#!"
+        game <- applyMove game game.nextPlayer move 
+    printfn "GAME OVER"
     0 // return an integer exit code
