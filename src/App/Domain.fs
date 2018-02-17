@@ -24,9 +24,9 @@ module Go.Domain
         [
             { point with row = point.row - 1 }
             { point with row = point.row + 1 }
-            { point with row = point.col - 1 }
-            { point with row = point.col + 1 }
-        ] |> Seq.filter isOnGrid
+            { point with col = point.col - 1 }
+            { point with col = point.col + 1 }
+         ] |> Seq.filter isOnGrid
 
     type Move = 
     | Play of Point
@@ -55,21 +55,26 @@ module Go.Domain
                            |> Set.add (Liberty point)}
 
     let merge sg1 sg2 =
-        let stones = Set.union sg1.stones sg2.stones
+        let stones = sg1.stones + sg2.stones
         let stonePoints = stones |> Set.map (fun (Stone p) -> p )
         { color = sg1.color
           stones = stones
-          liberties = (Set.union sg1.liberties sg2.liberties
-                       |> Set.filter (fun ( Liberty p) -> not (stonePoints |> Set.contains p))) }
+          liberties = (sg1.liberties + sg2.liberties) - (stonePoints |> Seq.map (fun pt -> (Liberty pt)) |> Set.ofSeq)
+        }
 
     type Grid = seq<Point * StoneGroup>
 
     let removePoint grid point = 
         grid |> Seq.filter (fun (p, _) -> p <> point)
 
-    let replaceStoneGroup grid point stoneGroup =
-        let newGrid = removePoint grid point
-        newGrid |> Seq.append (Seq.singleton (point, stoneGroup))
+    let replaceStoneGroup grid point stoneGroup   =
+        removePoint grid point |> Seq.append (Seq.singleton (point, stoneGroup))
+
+    let replaceWholeStoneGroup grid stoneGroup = 
+        let mutable newGrid = grid
+        for (Stone pt) in stoneGroup.stones do
+            newGrid <-  replaceStoneGroup (removePoint newGrid pt) pt stoneGroup
+        newGrid
 
     type Board = {
         size: int
@@ -82,20 +87,21 @@ module Go.Domain
         |> Option.map (fun (_, sg) -> sg)
     
     let removeStoneGroup grid stoneGroup size = 
-        let mutable newGrid = grid
-        let updateNeighborStoneGroup nb =
-            let neighborStoneGroup = getStoneGroup grid nb
+        let updateNeighborStoneGroup nb pt grd =
+            let neighborStoneGroup = getStoneGroup grd nb
             match neighborStoneGroup with
             | Some sg -> if sg <> stoneGroup 
                          then 
-                             let nbStoneGroup = addLiberty sg nb
-                             newGrid <- replaceStoneGroup grid nb nbStoneGroup
-            | None -> ()
+                             let nbStoneGroup = addLiberty sg pt
+                             replaceWholeStoneGroup grd nbStoneGroup
+                         else grd
+            | None -> grd
 
-        for (Stone p ) in stoneGroup.stones do
+        let mutable newGrid = grid
+        for (Stone p) in stoneGroup.stones do
             for neighbor in (neighbors p size) do
-                updateNeighborStoneGroup neighbor
-            newGrid <- (removePoint grid p)
+                newGrid <- updateNeighborStoneGroup neighbor p newGrid
+            newGrid <- (removePoint newGrid p)
         newGrid
 
     // assumes ((isOnGrid board point) && board.grid.ContainsKey point) 
@@ -109,8 +115,8 @@ module Go.Domain
             match neighborStoneGroup with
             | Some sg -> 
                 if (sg.color = col) 
-                then adjacentSameColor <- (adjacentSameColor.Add sg) 
-                else adjacentOppositeColor <- (adjacentOppositeColor.Add sg)
+                then adjacentSameColor <- (adjacentSameColor |> Set.add sg) 
+                else adjacentOppositeColor <- (adjacentOppositeColor |> Set.add sg)
             | None -> liberties <- (liberties |> Set.add (Liberty nb))
         let mutable newStoneGroup = { 
                                 color = col
@@ -119,13 +125,13 @@ module Go.Domain
                                 }
         for sameColorSg in adjacentSameColor do
             newStoneGroup <- merge newStoneGroup sameColorSg
-        for (Stone p) in newStoneGroup.stones do
-            grid <- replaceStoneGroup grid p newStoneGroup
+        grid <- replaceWholeStoneGroup grid newStoneGroup
         let oppositeColorRemovedLiberties = adjacentOppositeColor 
-                                            |> Set.map (fun sg -> removeLiberty sg point)
-        for sg in oppositeColorRemovedLiberties do
+                                            |> Set.map (fun sg-> removeLiberty sg point)
+        for sg in oppositeColorRemovedLiberties do 
             if Set.count sg.liberties = 0
             then grid <- removeStoneGroup grid sg board.size
+            else grid <- replaceWholeStoneGroup grid sg
         { board with grid = grid }
 
     type GameState = {
@@ -181,14 +187,13 @@ module Go.Domain
                      | Some sg -> sg.liberties.Count = 0
         | _ -> false
 
-    let rec equalsPreviousState gameState player nextBoard =
-        match gameState with
-        | None -> false
-        | Some gs -> if gs.nextPlayer = other player && gs.board = nextBoard 
-                     then true
-                     else equalsPreviousState gs.previousState player nextBoard
-
     let doesViolateKo gameState player move =
+        let rec equalsPreviousState gameState player nextBoard =
+            match gameState with
+            | None -> false
+            | Some gs -> if gs.nextPlayer = other player && gs.board = nextBoard 
+                         then true
+                         else equalsPreviousState gs.previousState player nextBoard
         match move with
         | Play pt -> let nextBoard = placeStone gameState.board player pt
                      let pastState = gameState.previousState
@@ -217,7 +222,7 @@ module Go.Domain
                     then false 
                     else
                         let offBoardCorners = 4 - (Seq.length nbs)
-                        let friendlyCorners = 4 - offBoardCorners - unfriendlyCorners
+                        let friendlyCorners = 4 - offBoardCorners
                         if offBoardCorners > 0 
                         then offBoardCorners + friendlyCorners = 4
                         else friendlyCorners >= 3
