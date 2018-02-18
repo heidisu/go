@@ -99,35 +99,33 @@ module Go.Domain
                                                                          |> Seq.fold (fun g nb -> updateNeighborStoneGroup nb p g) gr
                                             removePoint (neighborsUpdated pt gr) pt) grid
  
-    // assumes ((isOnGrid board point) && board.grid.ContainsKey point) 
+    type NeighbourState = private { 
+                                    adjacentSameColor: Set<StoneGroup>
+                                    adjacentOppositeColor: Set<StoneGroup>
+                                    liberties: Set<Liberty>
+                                  }
     let placeStone board (Player col) point = 
-        let mutable adjacentSameColor = Set.empty
-        let mutable  adjacentOppositeColor = Set.empty
-        let mutable liberties = Set.empty
-        let mutable grid = board.grid
-        for nb in (neighbors point board.size) do
-            let neighborStoneGroup = getStoneGroup grid nb
-            match neighborStoneGroup with
-            | Some sg -> 
-                if (sg.color = col) 
-                then adjacentSameColor <- (adjacentSameColor |> Set.add sg) 
-                else adjacentOppositeColor <- (adjacentOppositeColor |> Set.add sg)
-            | None -> liberties <- (liberties |> Set.add (Liberty nb))
-        let mutable newStoneGroup = { 
-                                color = col
-                                stones = Set.singleton (Stone point)
-                                liberties = liberties
-                                }
-        for sameColorSg in adjacentSameColor do
-            newStoneGroup <- merge newStoneGroup sameColorSg
-        grid <- replaceWholeStoneGroup grid newStoneGroup
-        let oppositeColorRemovedLiberties = adjacentOppositeColor 
+        let neighbourState = (neighbors point board.size)
+                             |> Seq.fold (fun state nb ->  let neighborStoneGroup = getStoneGroup board.grid nb
+                                                           match neighborStoneGroup with
+                                                           | Some sg -> if (sg.color = col) 
+                                                                        then {state with adjacentSameColor = state.adjacentSameColor.Add sg}  
+                                                                        else { state with adjacentOppositeColor = state.adjacentOppositeColor.Add sg}
+                                                           | None -> {state with liberties = state.liberties.Add (Liberty nb) })
+                                                           { adjacentSameColor = Set.empty
+                                                             adjacentOppositeColor = Set.empty
+                                                             liberties = Set.empty}
+        let newStoneGroup = neighbourState.adjacentSameColor 
+                            |> Set.fold (merge) {   color = col
+                                                    stones = Set.singleton (Stone point)
+                                                    liberties = neighbourState.liberties}
+        let oppositeColorRemovedLiberties = neighbourState.adjacentOppositeColor 
                                             |> Set.map (fun sg-> removeLiberty sg point)
-        for sg in oppositeColorRemovedLiberties do 
-            if Set.count sg.liberties = 0
-            then grid <- removeStoneGroup grid sg board.size
-            else grid <- replaceWholeStoneGroup grid sg
-        { board with grid = grid }
+        let newGrid = oppositeColorRemovedLiberties
+                      |> Set.fold (fun gr sg -> if Set.count sg.liberties = 0
+                                                then removeStoneGroup gr sg board.size
+                                                else replaceWholeStoneGroup gr sg) (replaceWholeStoneGroup board.grid newStoneGroup)
+        { board with grid = newGrid }
 
     type GameState = {
         board: Board
