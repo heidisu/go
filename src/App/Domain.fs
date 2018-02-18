@@ -15,18 +15,19 @@ module Go.Domain
         col: int
     }
 
-    let neighbors point size = 
-        let isOnGrid point = 
+    let isOnGrid size point = 
             1 <= point.row  
             && point.row <= size 
             && 1 <= point.col 
             && point.col <= size
+
+    let neighbors point size = 
         [
             { point with row = point.row - 1 }
             { point with row = point.row + 1 }
             { point with col = point.col - 1 }
             { point with col = point.col + 1 }
-         ] |> Seq.filter isOnGrid
+         ] |> Seq.filter(isOnGrid size)
 
     type Move = 
     | Play of Point
@@ -62,30 +63,26 @@ module Go.Domain
           liberties = (sg1.liberties + sg2.liberties) - (stonePoints |> Seq.map (fun pt -> (Liberty pt)) |> Set.ofSeq)
         }
 
-    type Grid = seq<Point * StoneGroup>
+    type Grid = Map<Point, StoneGroup>
 
-    let removePoint grid point = 
-        grid |> Seq.filter (fun (p, _) -> p <> point)
+    let removePoint (grid : Grid) point= 
+        grid.Remove point
 
-    let replaceStoneGroup grid point stoneGroup   =
-        removePoint grid point |> Seq.append (Seq.singleton (point, stoneGroup))
+    let replaceStoneGroup (grid :Grid) point stoneGroup   =
+        grid.Add (point, stoneGroup)
 
-    let replaceWholeStoneGroup grid stoneGroup = 
-        let mutable newGrid = grid
-        for (Stone pt) in stoneGroup.stones do
-            newGrid <-  replaceStoneGroup (removePoint newGrid pt) pt stoneGroup
-        newGrid
+    let replaceWholeStoneGroup (grid : Grid) stoneGroup = 
+        stoneGroup.stones
+        |> Set.fold (fun gr (Stone pt) -> (replaceStoneGroup gr pt stoneGroup)) grid
 
     type Board = {
         size: int
         grid: Grid
     }
 
-    let getStoneGroup grid point = 
-        grid
-        |> Seq.tryFind (fun (p, _) -> p = point) 
-        |> Option.map (fun (_, sg) -> sg)
-    
+    let getStoneGroup (grid : Grid) point  = 
+        grid.TryFind point
+      
     let removeStoneGroup grid stoneGroup size = 
         let updateNeighborStoneGroup nb pt grd =
             let neighborStoneGroup = getStoneGroup grd nb
@@ -97,13 +94,11 @@ module Go.Domain
                          else grd
             | None -> grd
 
-        let mutable newGrid = grid
-        for (Stone p) in stoneGroup.stones do
-            for neighbor in (neighbors p size) do
-                newGrid <- updateNeighborStoneGroup neighbor p newGrid
-            newGrid <- (removePoint newGrid p)
-        newGrid
-
+        stoneGroup.stones 
+        |> Set.fold (fun gr (Stone pt) ->   let neighborsUpdated  p gr = (neighbors p size)
+                                                                         |> Seq.fold (fun g nb -> updateNeighborStoneGroup nb p g) gr
+                                            removePoint (neighborsUpdated pt gr) pt) grid
+ 
     // assumes ((isOnGrid board point) && board.grid.ContainsKey point) 
     let placeStone board (Player col) point = 
         let mutable adjacentSameColor = Set.empty
@@ -161,7 +156,7 @@ module Go.Domain
     let newGame boardSize = {
         board = { 
                     size = boardSize 
-                    grid = Seq.empty
+                    grid = Map.empty
                 }
         nextPlayer = Player Black
         previousState = None
@@ -211,20 +206,27 @@ module Go.Domain
 
     let pointIsEye board point (Player color) =
         match getStoneGroup board.grid point with   
-        | None -> false
-        | Some _ -> let nbs = neighbors point board.size
-                    let unfriendlyCorners = nbs
-                                            |> Seq.filter (fun nb -> let nbSg = getStoneGroup board.grid nb
-                                                                     nbSg.IsSome && nbSg.Value.color <> color
-                                             )
-                                             |> Seq.length
-                    if unfriendlyCorners > 0
-                    then false 
-                    else
-                        let offBoardCorners = 4 - (Seq.length nbs)
-                        let friendlyCorners = 4 - offBoardCorners
-                        if offBoardCorners > 0 
-                        then offBoardCorners + friendlyCorners = 4
-                        else friendlyCorners >= 3
+        | Some _  -> false
+        | None ->   let nbs = neighbors point board.size
+                    match (nbs |> Seq.tryFind (fun nb -> let nbSg = getStoneGroup board.grid nb
+                                                         nbSg.IsSome && nbSg.Value.color <> color)) with
+                    | Some _ -> false
+                    | None ->   let corners =   let col = point.col
+                                                let row = point.row
+                                                [
+                                                    { row = row - 1; col = col - 1}
+                                                    { row = row - 1; col = col + 1 }
+                                                    { row = row + 1; col = col - 1 }
+                                                    { row = row + 1; col = col + 1 }
+                                                ] |> Seq.filter (isOnGrid board.size)
+                                let friendlyCorners = corners
+                                                    |> Seq.filter (fun corner -> let cornerSg = getStoneGroup board.grid corner
+                                                                                 cornerSg.IsSome && cornerSg.Value.color = color
+                                                                  )
+                                                    |> Seq.length
+                                let offBoardCorners = 4 - (Seq.length corners)
+                                if offBoardCorners > 0
+                                then offBoardCorners + friendlyCorners = 4
+                                else friendlyCorners >= 3
                         
 
