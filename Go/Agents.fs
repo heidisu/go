@@ -1,5 +1,5 @@
 module Go.Agents
-    open Go.Domain
+    open Go.Game
     
     type Agent = RandomAgent
 

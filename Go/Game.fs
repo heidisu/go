@@ -1,4 +1,4 @@
-module Go.Domain
+module Go.Game
     open System
 
     type Color = Black | White

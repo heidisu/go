@@ -2,7 +2,7 @@ module Tests
 
 open System
 open Xunit
-open Go.Domain
+open Go.Game
 
 [<Fact>]
 let ``inner point has four neighbors`` () =

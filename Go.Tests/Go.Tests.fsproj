@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\App\App.fsproj" />
+    <ProjectReference Include="..\Go\Go.fsproj" />
   </ItemGroup>
 
 </Project>

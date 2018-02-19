@@ -1,4 +1,4 @@
-﻿open Go.Domain
+﻿open Go.Game
 open Go.Agents
 open System
 
