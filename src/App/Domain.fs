@@ -68,12 +68,9 @@ module Go.Domain
     let removePoint (grid : Grid) point= 
         grid.Remove point
 
-    let replaceStoneGroup (grid :Grid) point stoneGroup   =
-        grid.Add (point, stoneGroup)
-
-    let replaceWholeStoneGroup (grid : Grid) stoneGroup = 
+    let replaceStoneGroup (grid : Grid) stoneGroup = 
         stoneGroup.stones
-        |> Set.fold (fun gr (Stone pt) -> (replaceStoneGroup gr pt stoneGroup)) grid
+        |> Set.fold (fun (gr :Grid) (Stone pt) -> gr.Add (pt, stoneGroup)) grid
 
     type Board = {
         size: int
@@ -90,7 +87,7 @@ module Go.Domain
             | Some sg -> if sg <> stoneGroup 
                          then 
                              let nbStoneGroup = addLiberty sg pt
-                             replaceWholeStoneGroup grd nbStoneGroup
+                             replaceStoneGroup grd nbStoneGroup
                          else grd
             | None -> grd
 
@@ -124,7 +121,7 @@ module Go.Domain
         let newGrid = oppositeColorRemovedLiberties
                       |> Set.fold (fun gr sg -> if Set.count sg.liberties = 0
                                                 then removeStoneGroup gr sg board.size
-                                                else replaceWholeStoneGroup gr sg) (replaceWholeStoneGroup board.grid newStoneGroup)
+                                                else replaceStoneGroup gr sg) (replaceStoneGroup board.grid newStoneGroup)
         { board with grid = newGrid }
 
     type GameState = {
