@@ -30,20 +30,22 @@ let printBoard board =
         printfn ""
      printfn "  %s" (cols |> Seq.take board.size |> String.Concat)
 
-
-[<EntryPoint>]
-let main argv =
-    let boardSize = 9
-    let mutable game = newGame boardSize
-    let bots player = 
+let bots player = 
         match player with
         | Player Black -> RandomAgent
         | Player White -> RandomAgent
 
-    while not (isOver game) do
-        printBoard game.board
-        let move = selectMove game (bots game.nextPlayer)
-        printMove game.nextPlayer move
-        game <- applyMove game game.nextPlayer move 
-    printfn "GAME OVER"
+let rec play game = 
+    match (isOver game) with
+    | true -> printfn "GAME OVER"
+    | false -> printBoard game.board
+               let move = selectMove game (bots game.nextPlayer)
+               printMove game.nextPlayer move
+               play (applyMove game game.nextPlayer move)
+
+
+[<EntryPoint>]
+let main argv  =
+    let boardSize = 9
+    newGame boardSize |> play
     0 // return an integer exit code
