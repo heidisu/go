@@ -43,7 +43,6 @@ let rec play game =
                printMove game.nextPlayer move
                play (applyMove game game.nextPlayer move)
 
-
 [<EntryPoint>]
 let main argv  =
     let boardSize = 9

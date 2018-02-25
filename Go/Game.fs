@@ -225,3 +225,8 @@ module Go.Game
                                 else friendlyCorners >= 3
                         
 
+    let validMoves gameState = 
+        seq { for i in 1 .. gameState.board.size 
+                    do for j in 1 .. gameState.board.size do yield {row = i; col = j}}
+        |> Seq.filter (fun pt ->  isValidMove gameState (Play pt) &&
+                                  not (pointIsEye gameState.board pt gameState.nextPlayer))
