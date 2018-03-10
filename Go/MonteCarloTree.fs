@@ -2,63 +2,80 @@ module Go.MonteCarloTree
     open Go.Game
     open System
 
-    type WinConts = Map<Player, int>
+    let utcScore parentRollouts childRollouts winPct = 
+        let exploration = Math.Sqrt (Math.Log(float parentRollouts)/(float childRollouts))
+        winPct + 1.5 * exploration
 
-    type MCTSNode = { 
-                        gameState : GameState
-                        winCounts : WinConts
-                        numRollouts : int
-                        unvisitedMoves: seq<Move>
-                        children: seq<MCTSNode>
-                    }
+    type private MCTSNode(gameState, parent, move) =
+        let mutable winCounts = Map.empty |> Map.add (Player Black) 0 |> Map.add (Player White) 0
+        let mutable numRollouts = 0
+        let mutable children = Seq.empty
+        let mutable unvisitedMoves = Seq.empty
+        let random = Random()
+        member this.GameState = gameState
+        member this.Move = move
+        member this.Parent = parent
 
-    let rnd = Random()
-    
-    let createNode gameState = 
-        let initialWinCounts = (Map.empty.Add(Player Black, 0)).Add (Player White, 0)
-        { 
-            gameState = gameState
-            winCounts = initialWinCounts
-            numRollouts = 0
-            unvisitedMoves = validMoves gameState |> Seq.map (fun pt -> Play pt)
-            children = Seq.empty
-        }
-    
-    let addRandomChild node = 
-        let index = rnd.Next (Seq.length node.unvisitedMoves - 1)
-        let newMove = node.unvisitedMoves |> Seq.item index
-        let newGameState = applyMove node.gameState node.gameState.nextPlayer newMove
-        let newChild = createNode newGameState        
-        { node with  unvisitedMoves = node.unvisitedMoves |> Seq.filter (fun mv -> mv <> newMove)
-                     children = node.children |> Seq.append [newChild] }
-    
-    let recordWin node winner = 
-        let count = match (node.winCounts |> Map.tryFind winner) with
-                    | Some x -> x
-                    | None -> 0
-        { node with winCounts = node.winCounts.Add (winner, count + 1); numRollouts = node.numRollouts + 1 }
-    
-    let canAddChild node = 
-        Seq.length node.unvisitedMoves > 0
-    
-    let isTerminal node = 
-        isOver node.gameState
+        member this.Children = children
+        member this.NumRollouts = numRollouts
 
-    let winningPct node player = 
-        (Map.tryFind node.winCounts player) 
-        |> Option.map (fun i -> (float i) / (float node.numRollouts) ) 
-        |> Option.defaultWith ( fun() -> 0.0)
+        member this.AddWinner winner = 
+            let prevCount = winCounts.TryFind winner |> Option.defaultValue 0
+            winCounts <- winCounts |> Map.add winner (prevCount + 1)
+            numRollouts <- numRollouts + 1
 
-    let selectChild node = node // todo fix
-    
-    let rec selectNode node = 
-        if canAddChild node || isTerminal node
+        member this.AddRandomChild = 
+            let index = random.Next (Seq.length unvisitedMoves - 1)
+            let newMove = unvisitedMoves |> Seq.item index
+            let newGameState = applyMove gameState gameState.nextPlayer newMove
+            let child = MCTSNode(newGameState, Some this, Some newMove)
+            children <- Seq.append [child] children
+            child
+
+        member this.CanAddChild = 
+            Seq.length unvisitedMoves > 0
+
+        member this.IsTerminal = 
+            isOver gameState   
+
+        member this.WinningPercent player = 
+            Map.tryFind player winCounts
+            |> Option.map (fun i -> (float i) / (float numRollouts) ) 
+            |> Option.defaultValue 0.0
+
+        member this.SelectChild player = 
+            let totalRollouts = Seq.sumBy (fun (c : MCTSNode) -> c.NumRollouts) children
+            children
+            |> Seq.map (fun c -> (c, utcScore totalRollouts c.NumRollouts (c.WinningPercent player)))
+            |> Seq.maxBy (fun (_, n) -> n)
+            |> fst
+
+
+
+    let private selectNode (node :MCTSNode) player = 
+        if node.CanAddChild
+        then node.AddRandomChild
+        elif node.IsTerminal
         then node
-        else (selectChild node) |> selectNode
+        else node.SelectChild player
 
-    let selectMove gameState =
-        let root = createNode gameState  
+    let rec private updateWinningState (node : Option<MCTSNode>) winner =
+        match node with
+        | Some n -> n.AddWinner winner
+                    updateWinningState n.Parent winner
+        | None -> ()
 
-    type MCTSTree = 
-       | Branch of MCTSNode * MCTSTree list
-       | Leaf of MCTSNode
+    let simulateRandomGame gameState = 
+        Player Black
+
+    let selectMove gameState numRounds = 
+        let root = MCTSNode(gameState, None, None)
+        for i in 1 .. numRounds do
+            let node = selectNode root gameState.nextPlayer
+            let winner = simulateRandomGame node
+            updateWinningState (Some node) winner
+
+        root.Children
+        |> Seq.map (fun c -> (c.WinningPercent gameState.nextPlayer, c.Move))
+        |> Seq.maxBy (fun (p, m) -> p)
+        |> snd
