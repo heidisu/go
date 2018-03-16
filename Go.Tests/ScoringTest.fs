@@ -52,3 +52,4 @@ let ``computes correct scoring`` () =
     let gameResult = getGameResult { board = filledBoard; nextPlayer = (Player Black); lastMove = Some Pass;  previousState = None }
 
     Assert.Equal (Player White, gameResult.winner)
+    Assert.Equal (abs(9.0 + 4.0 - (9.0 + 3.0 + 7.5)), gameResult.winningMargin)

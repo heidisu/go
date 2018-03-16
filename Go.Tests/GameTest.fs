@@ -1,6 +1,5 @@
-module Tests
+module Go.Game.Test
 
-open System
 open Xunit
 open Go.Game
 

@@ -9,7 +9,7 @@ let stoneToChar sg =
     | None -> "."
     | Some sg -> if sg.color = Black then "x" else "o"
 
-let playerString player = 
+let toString player = 
     match player with
     | Player Black -> "black"
     | Player White -> "white"
@@ -20,7 +20,7 @@ let printMove player move =
         | Pass -> "passes"
         | Resign -> "resigns"
         | Play pt -> sprintf"%c%d" (cols |> Seq.item (pt.col-1)) pt.row
-    printfn "%s %s" (playerString player) moveString
+    printfn "%s %s" (toString player) moveString
 
 let printBoard board =
      for i in board.size .. -1 .. 1 do 
@@ -41,7 +41,7 @@ let rec play game =
     match (isOver game) with
     | true ->  let gameResult = getGameResult game
                printfn "GAME OVER"
-               printfn "Winner: %s" (playerString gameResult.winner)
+               printfn "Winner: %s" (toString gameResult.winner)
                printfn "Winning margin: %f" gameResult.winningMargin
     | false -> printBoard game.board
                let move = selectMove game (bots game.nextPlayer)
