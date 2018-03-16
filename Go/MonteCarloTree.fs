@@ -79,42 +79,29 @@ module Go.MonteCarloTree
     let simulateRandomGame gameState = 
         Player Black
     
-    let rec private updateWinningState node winner =
+    let rec private updateWinningState node child move winner =
         let prevCount = Map.find winner node.winCounts
-        {node with winCounts = Map.add winner (prevCount + 1) node.winCounts; numRollouts = node.numRollouts + 1}
-        //match node with
-        //| Some n -> addWinner winner node
-        //            updateWinningState n.Parent winner
-        //| None -> ()
-    
-    //let backprop node child winner = 
-    //    { node with children =  Map.add move updatedChild node.childre }
+        { node with children = Map.add move child node.children
+                    numRollouts = node.numRollouts + 1
+                    winCounts = Map.add winner (prevCount + 1) node.winCounts}
 
     let rec select node  = 
         if not (canAddChild node) && not (isTerminal node)
         then let (move, child) = selectChild node.gameState.nextPlayer node
-             let expanded = select child
-             { node with children = Map.add move expanded node.children}
+             let (winner, expanded) = select child
+             (winner, updateWinningState node expanded move winner)
         elif canAddChild node
         then let move = getRandomMove node
              let nextState = applyMove node.gameState node.gameState.nextPlayer (Play move)
              let winner = simulateRandomGame nextState
              let child =  createNodeFromWinner nextState winner
-             { node with children = Map.add move child node.children; numRollouts = node.numRollouts + 1; winCounts = Map.add winner ((Map.find winner node.winCounts) + 1) node.winCounts} 
-        else node
-        
-
-        //f canAddChild node
-        //then addRandomChild node
-        //elif isTerminal node
-        //then node
-        //else let exploredNode = selectChild node.gameState.nextPlayer node |> select
-          //   updateWinningState node exploredNode
+             (winner, updateWinningState node child move winner)
+        else (Player Black, node) //TODO: Fix
 
     let selectMove gameState numRounds = 
         let root =
             seq { 1 .. numRounds}
-            |> Seq.fold (fun node _ -> select node) (createNode gameState)
+            |> Seq.fold (fun node _ -> select node |> snd) (createNode gameState)
 
         root.children
         |> Map.toSeq
