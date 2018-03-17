@@ -1,5 +1,7 @@
-module Go.MonteCarloTree
+module Go.MonteCarloTreeSearch
     open Go.Game
+    open Go.Scoring
+    open Go.RandomPlay
     open System
 
     let utcScore parentRollouts childRollouts winPct = 
@@ -8,7 +10,7 @@ module Go.MonteCarloTree
 
     type MCTSNode = { 
         possibleMoves: seq<Point>
-        children: Map<Point, MCTSNode>
+        children: Map<Move, MCTSNode>
         numRollouts: int
         gameState: GameState
         winCounts: Map<Player, int>
@@ -27,28 +29,16 @@ module Go.MonteCarloTree
         let node = createNode gameState
         { node with numRollouts = 1; winCounts = Map.add winner 1 node.winCounts }
 
-    let merge node1 node2 = 
-        let mergedWincounts = 
-            [Player Black; Player White]
-            |> Seq.map (fun p -> (p, (Map.find p node1.winCounts) + (Map.find p node2.winCounts)))
-            |> Seq.fold (fun map pair -> Map.add (fst pair) (snd pair) map) Map.empty
-        {
-            possibleMoves = node1.possibleMoves
-            gameState = node1.gameState
-            numRollouts = node1.numRollouts + node2.numRollouts
-            winCounts = mergedWincounts
-            children = Map.empty
-        }
-
     let unvisitedMoves node = 
         validMoves node.gameState
-        |> Seq.filter (fun pt -> not (Map.containsKey pt node.children))
+        |> Seq.map (Play)
+        |> Seq.filter (fun mv -> not (Map.containsKey mv node.children))
 
     let canAddChild node = 
         Seq.length (unvisitedMoves node) > 0
 
     let isTerminal node = 
-        isOver node.gameState   
+        validMoves node.gameState |> Seq.isEmpty
 
     let winningPercent node player = 
         Map.tryFind player node.winCounts
@@ -68,7 +58,7 @@ module Go.MonteCarloTree
         let possibleMoves = unvisitedMoves node
         let index = random.Next (Seq.length possibleMoves - 1)
         let newMove = possibleMoves |> Seq.item index
-        let newGameState = applyMove node.gameState node.gameState.nextPlayer (Play newMove)
+        let newGameState = applyMove node.gameState node.gameState.nextPlayer newMove
         (newMove, createNode newGameState)
 
     let getRandomMove node = 
@@ -77,7 +67,14 @@ module Go.MonteCarloTree
         possibleMoves |> Seq.item index
 
     let simulateRandomGame gameState = 
-        Player Black
+        let rec play game = 
+            match (isOver game) with
+            | true ->  let gameResult = getGameResult game
+                       gameResult.winner
+            | false -> let move = selectRandomMove game
+                       play (applyMove game game.nextPlayer move)
+        play gameState
+
     
     let rec private updateWinningState node child move winner =
         let prevCount = Map.find winner node.winCounts
@@ -92,19 +89,23 @@ module Go.MonteCarloTree
              (winner, updateWinningState node expanded move winner)
         elif canAddChild node
         then let move = getRandomMove node
-             let nextState = applyMove node.gameState node.gameState.nextPlayer (Play move)
+             let nextState = applyMove node.gameState node.gameState.nextPlayer move
              let winner = simulateRandomGame nextState
              let child =  createNodeFromWinner nextState winner
              (winner, updateWinningState node child move winner)
-        else (Player Black, node) //TODO: Fix
+        else let gameResult = getGameResult node.gameState
+             (gameResult.winner, node)
 
     let selectMove gameState numRounds = 
-        let root =
-            seq { 1 .. numRounds}
-            |> Seq.fold (fun node _ -> select node |> snd) (createNode gameState)
+        if validMoves gameState |> Seq.isEmpty
+        then Pass
+        else 
+            let root =
+                seq { 1 .. numRounds}
+                |> Seq.fold (fun node _ -> select node |> snd) (createNode gameState)
 
-        root.children
-        |> Map.toSeq
-        |> Seq.map (fun (move, child) -> (winningPercent child gameState.nextPlayer, move))
-        |> Seq.maxBy (fun (p,_) -> p)
-        |> (fun (_, pt) -> Play pt)
+            root.children
+            |> Map.toSeq
+            |> Seq.map (fun (move, child) -> (winningPercent child gameState.nextPlayer, move))
+            |> Seq.maxBy (fun (p,_) -> p)
+            |> (fun (_, move) -> move)

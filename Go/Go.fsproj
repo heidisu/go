@@ -8,7 +8,8 @@
   <ItemGroup>
     <Compile Include="Game.fs" />
     <Compile Include="Scoring.fs" />
-    <Compile Include="MonteCarloTree.fs" />
+    <Compile Include="RandomPlay.fs" />
+    <Compile Include="MonteCarloTreeSearch.fs" />
     <Compile Include="Agents.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

@@ -1,20 +1,10 @@
 module Go.Agents
-    open Go.Game
+    open Go.MonteCarloTreeSearch
+    open Go.RandomPlay
     
-    type Agent = RandomAgent
-
-    let private selectRandomMove gameState =
-        let rnd = System.Random()
-        let candidates =  validMoves gameState
-
-        if Seq.isEmpty candidates
-        then Pass
-        else
-            let randomIndex = rnd.Next (Seq.length candidates - 1)
-            let randomPt = Seq.item randomIndex candidates 
-            Play randomPt
+    type Agent = RandomAgent | MonteCarloAgent
 
     let selectMove gameState agent = 
         match agent with
         | RandomAgent -> selectRandomMove gameState
-    
+        | MonteCarloAgent -> selectMove gameState 100
