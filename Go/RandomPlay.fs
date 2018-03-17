@@ -10,5 +10,4 @@ module Go.RandomPlay
         then Pass
         else
             let randomIndex = rnd.Next (Seq.length candidates - 1)
-            let randomPt = Seq.item randomIndex candidates 
-            Play randomPt
+            Seq.item randomIndex candidates 

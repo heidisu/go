@@ -9,7 +9,7 @@ module Go.MonteCarloTreeSearch
         winPct + 1.5 * exploration
 
     type MCTSNode = { 
-        possibleMoves: seq<Point>
+        possibleMoves: seq<Move>
         children: Map<Move, MCTSNode>
         numRollouts: int
         gameState: GameState
@@ -31,7 +31,6 @@ module Go.MonteCarloTreeSearch
 
     let unvisitedMoves node = 
         validMoves node.gameState
-        |> Seq.map (Play)
         |> Seq.filter (fun mv -> not (Map.containsKey mv node.children))
 
     let canAddChild node = 
