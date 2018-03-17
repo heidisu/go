@@ -9,4 +9,4 @@ White player | Black player | White wins | Black wins
 Random | Random | 59 | 41
 Random | Monte Carlo | 0 | 100
 Monte Carlo | Random | 99 | 1
-Monte Carlo | Monte Carlo | 52 | 4
+Monte Carlo | Monte Carlo | 52 | 48
