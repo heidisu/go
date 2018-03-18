@@ -1,4 +1,6 @@
 # The Game of Go in F#
+[![Build Status](https://travis-ci.org/heidisu/go.svg?branch=master)](https://travis-ci.org/heidisu/go)
+
 I'm trying to learn more about Alpha Go Zero and came across the book [Deep Learning and the Game of Go](https://www.manning.com/books/deep-learning-and-the-game-of-go), accompanied by code in Python [here](https://github.com/maxpumperla/deep_learning_and_the_game_of_go).
 This repo is my attempt to implement the same in F# while reading the book.
 
