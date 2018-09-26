@@ -1,10 +1,19 @@
 module Go.Agents
-    open Go.MonteCarloTreeSearch
-    open Go.RandomPlay
-    
-    type Agent = RandomAgent | MonteCarloAgent
 
-    let selectMove gameState agent = 
-        match agent with
-        | RandomAgent -> selectRandomMove gameState
-        | MonteCarloAgent -> selectMove gameState 100
+open Go.Game
+open Go.MonteCarloTreeSearch
+open Go.RandomPlay
+
+type Agent = {
+    name: string
+    selectMove: GameState -> Move
+}
+
+let randomAgent = {
+    name = "random" 
+    selectMove = selectRandomMove
+}
+let monteCarloAgent = {
+    name = "monte carlo"
+    selectMove = selectMove 100
+}

@@ -1,13 +1,13 @@
 module Go.RandomPlay
 
-    open Go.Game
+open Go.Game
 
-     let selectRandomMove gameState =
-        let rnd = System.Random()
-        let candidates =  validMoves gameState
+ let selectRandomMove gameState =
+    let rnd = System.Random()
+    let candidates =  validMoves gameState
 
-        if Seq.isEmpty candidates
-        then Pass
-        else
-            let randomIndex = rnd.Next (Seq.length candidates - 1)
-            Seq.item randomIndex candidates 
+    if Seq.isEmpty candidates
+    then Pass
+    else
+        let randomIndex = rnd.Next (Seq.length candidates - 1)
+        Seq.item randomIndex candidates 

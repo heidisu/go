@@ -14,11 +14,6 @@ let printPlayer player =
     | Player Black -> "black"
     | Player White -> "white"
 
-let printAgent agent = 
-    match agent with
-    | RandomAgent -> "random"
-    | MonteCarloAgent -> "monte carlo"
-
 let printMove player move = 
     let moveString =
         match move with
@@ -39,53 +34,59 @@ let printBoard board =
 
 let bots player = 
         match player with
-        | Player Black -> RandomAgent
-        | Player White -> MonteCarloAgent
+        | Player Black -> randomAgent
+        | Player White -> monteCarloAgent
 
 let rec play bots game = 
     match (isOver game) with
-    | true ->  let gameResult = getGameResult game
-               printfn "GAME OVER"
-               printfn "Winner: %s" (printPlayer gameResult.winner)
-               printfn "Winning margin: %f" gameResult.winningMargin
-    | false -> printBoard game.board
-               let move = selectMove game (bots game.nextPlayer)
-               printMove game.nextPlayer move
-               play bots (applyMove game game.nextPlayer move)
+    | true ->  
+        let gameResult = getGameResult game
+        printfn "GAME OVER"
+        printfn "Winner: %s" (printPlayer gameResult.winner)
+        printfn "Winning margin: %f" gameResult.winningMargin
+    | false -> 
+        printBoard game.board
+        let move = (bots game.nextPlayer).selectMove game
+        printMove game.nextPlayer move
+        play bots (applyMove game game.nextPlayer move)
 
 let playGame boardSize = newGame boardSize |> play bots
 let benchmark boardSize numPlays = 
-    let bots (agent1, agent2) = 
-        fun player ->
-            match player with   
-            | Player White -> agent1
-            | Player Black -> agent2
+    let bots (agent1, agent2) player =
+        match player with
+        | Player White -> agent1
+        | Player Black -> agent2
     let rec play bots game = 
         match isOver game with
         | true -> getGameResult game
-        | false -> let move = selectMove game (bots game.nextPlayer)
-                   play bots (applyMove game game.nextPlayer move)
+        | false -> 
+            let move = (bots game.nextPlayer).selectMove game
+            play bots (applyMove game game.nextPlayer move)
     let printSimulation bots gameResults = 
-        let winGroups =  gameResults
-                         |> Seq.groupBy (fun gameRes -> gameRes.winner)
-                         |> Seq.map (fun (pl, res) -> (pl, Seq.length res))
+        let winGroups =  
+            gameResults
+            |> Seq.groupBy (fun gameRes -> gameRes.winner)
+            |> Seq.map (fun (pl, res) -> (pl, Seq.length res))
         let winCounts player =  
             winGroups
             |> Seq.tryFind (fun (pl, _) -> pl = player )
             |> Option.map snd
             |> Option.defaultValue 0
         printfn "White player: %s black player: %s white wins: %i black wins: %i" 
-            (printAgent (Player White |> bots))
-            (printAgent (Player Black |> bots))
+            (Player White |> bots).name
+            (Player Black |> bots).name
             (Player White |> winCounts)
             (Player Black |> winCounts)
-    let agents = [RandomAgent; MonteCarloAgent]
+    let agents = [randomAgent; monteCarloAgent]
     agents
     |> List.collect (fun ag1 -> agents |> List.map (fun ag2 -> (ag1, ag2)))
-    |> List.map ( bots)
-    |> List.iter (fun bots ->  let results = seq{ 1 .. numPlays} 
-                                             |> Seq.fold (fun state _ -> Seq.append state (Seq.singleton (play bots (newGame boardSize)))) Seq.empty
-                               printSimulation bots results)                                       
+    |> List.map bots
+    |> List.iter (
+        fun bots ->  
+            let results = 
+                seq{ 1 .. numPlays} 
+                |> Seq.fold (fun state _ -> Seq.append state (Seq.singleton (play bots (newGame boardSize)))) Seq.empty
+            printSimulation bots results)                                       
                                            
 [<EntryPoint>]
 let main argv  =
